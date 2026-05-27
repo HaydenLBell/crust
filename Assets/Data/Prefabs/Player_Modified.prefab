@@ -1531,7 +1531,7 @@ GameObject:
   - component: {fileID: 7594659721866874176}
   m_Layer: 17
   m_Name: Player Controller
-  m_TagString: Player
+  m_TagString: BodyShot
   m_Icon: {fileID: 2800000, guid: 36fa8c512d75b634ca0c945caa8b3f65, type: 3}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -1874,7 +1874,7 @@ MonoBehaviour:
     alternateAiming: 0
     hitLayer:
       serializedVersion: 2
-      m_Bits: 15753
+      m_Bits: 146825
     holsterBehaviour: 1
     userEvents:
       OnShoot:
@@ -1950,6 +1950,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1dab5aa70db5704cb2f4a0bea04093b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 280710769973369596}
+  _networkObjectCache: {fileID: 0}
   health: 0
   shield: 0
   maxHealth: 100
@@ -2423,7 +2426,7 @@ CapsuleCollider:
   m_Radius: 0.5
   m_Height: 2
   m_Direction: 1
-  m_Center: {x: 0, y: 0.5, z: 0}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!120 &7815289116072117262
 LineRenderer:
   serializedVersion: 3

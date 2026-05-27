@@ -21,6 +21,9 @@ namespace cowsins
         private void Awake()
         {
             playerStatusProvider = GetComponent<IPlayerStatsProvider>();
+            // Disable CompassElements before UI is disabled to prevent Start() race condition
+            foreach (var compass in this.transform.root.GetComponentsInChildren<CompassElement>(true))
+                compass.enabled = false;
         }
 
         public override void OnStartClient()
@@ -79,21 +82,42 @@ namespace cowsins
         {
             Transform root = transform.root;
 
-            // Input first
+            // Disable Input Manager
             Transform inputManagerObj = root.Find("Input Manager");
             if (inputManagerObj != null) inputManagerObj.gameObject.SetActive(false);
 
-            // Disable Player Controller
-            Transform playerController = root.Find("Player Controller");
-            if (playerController != null) playerController.gameObject.SetActive(false);
-
-            // Disable Camera GameObject entirely (hides weapons/hands)
+            // Disable Camera GameObject entirely
             Transform camera = root.Find("Camera");
             if (camera != null) camera.gameObject.SetActive(false);
 
             // Disable UI
             Transform playerUI = root.Find("PlayerUI");
             if (playerUI != null) playerUI.gameObject.SetActive(false);
+
+            // Disable specific components on Player Controller, keeping the GameObject active
+            Transform playerController = root.Find("Player Controller");
+            if (playerController != null)
+            {
+                // Disable local-only scripts
+                DisableComponent<PlayerMovement>(playerController);
+                DisableComponent<WeaponController>(playerController);
+                DisableComponent<InteractManager>(playerController);
+                DisableComponent<CameraEffects>(playerController);
+                DisableComponent<WeaponEffects>(playerController);
+                DisableComponent<WeaponStates>(playerController);
+                DisableComponent<WeaponAnimator>(playerController);
+                DisableComponent<PlayerStates>(playerController);
+
+                // Keep active: PlayerStats, PlayerControl, PlayerStates, 
+                //              PlayerMultipliers, PlayerDependencies
+                // Keep active: CapsuleCollider, Rigidbody
+            }
+        }
+
+        private void DisableComponent<T>(Transform target) where T : MonoBehaviour
+        {
+            T component = target.GetComponent<T>();
+            if (component != null) component.enabled = false;
         }
 
         /***************************************** GLOBAL/CORE CONTROL *************************************************/

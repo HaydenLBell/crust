@@ -45,32 +45,52 @@ namespace cowsins
         public void Hit(int layer, float damage, RaycastHit h, bool damageTarget)
         {
             if (weapon == null || h.collider == null) return;
+            Debug.Log($"Hit called on: {h.collider.name} | tag: {h.collider.tag} | damageTarget: {damageTarget}");
 
             settings.userEvents.OnHit?.Invoke();
             weaponEvents.Events.OnInstantiateBulletHoleImpact?.Invoke(layer, h);
-
             if (!damageTarget) return;
 
             var hitTransform = h.collider.transform;
             float finalDamage = damage * GetDistanceDamageReduction(hitTransform);
 
-            // Determine hit type and apply damage accordingly
             if (hitTransform.CompareTag("Critical"))
             {
                 settings.userEvents.OnCriticalHit?.Invoke();
                 var damageable = CowsinsUtilities.GatherDamageableParent(hitTransform);
-                damageable?.Damage(finalDamage * weapon.criticalDamageMultiplier, true);
+                ApplyDamage(damageable, finalDamage * weapon.criticalDamageMultiplier, true);
             }
             else if (hitTransform.CompareTag("BodyShot"))
             {
                 var damageable = CowsinsUtilities.GatherDamageableParent(hitTransform);
-                damageable?.Damage(finalDamage, false);
+
+                // Fallback: search the hit object itself and its parents
+                if (damageable == null)
+                    damageable = hitTransform.GetComponentInParent<IDamageable>();
+                if (damageable == null)
+                    damageable = hitTransform.GetComponent<IDamageable>();
+
+                ApplyDamage(damageable, finalDamage, false);
             }
             else
             {
                 var damageable = h.collider.GetComponent<IDamageable>();
-                damageable?.Damage(finalDamage, false);
+                ApplyDamage(damageable, finalDamage, false);
             }
+        }
+
+        private void ApplyDamage(IDamageable damageable, float damage, bool isHeadshot)
+        {
+            if (damageable == null)
+            {
+                Debug.Log("ApplyDamage: damageable is NULL");
+                return;
+            }
+
+            if (damageable is PlayerStats playerStats)
+                playerStats.RpcTakeDamage(damage, isHeadshot);
+            else
+                damageable.Damage(damage, isHeadshot);
         }
 
         private float GetDistanceDamageReduction(Transform target)

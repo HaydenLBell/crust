@@ -4,17 +4,20 @@
 using UnityEngine;
 using UnityEngine.Events;
 using System;
+using FishNet.Object;
+using FishNet.Object.Synchronizing;
 
 namespace cowsins
 {
     [System.Serializable]
-    public class PlayerStats : MonoBehaviour, IDamageable, IPlayerStatsProvider, IFallHeightProvider, IPlayerStatsEventsProvider
+    public class PlayerStats : NetworkBehaviour, IDamageable, IPlayerStatsProvider, IFallHeightProvider, IPlayerStatsEventsProvider
     {
         [System.Serializable]
         public class UserStatsEvents
         {
             public UnityEvent OnDeath, OnDamage, OnHeal;
         }
+
 
         #region variables
 
@@ -40,6 +43,8 @@ namespace cowsins
 
         [SerializeField] private float restartAutoHealTime;
 
+        private readonly SyncVar<float> _networkHealth = new SyncVar<float>();
+        private readonly SyncVar<float> _networkShield = new SyncVar<float>();
 
         // Internal use
 
@@ -88,11 +93,20 @@ namespace cowsins
                 StartAutoHeal();
         }
 
+        public override void OnStartNetwork()
+        {
+            base.OnStartNetwork();
+            _networkHealth.OnChange += OnHealthChanged_Network;
+        }
+
         private void Update()
         {
             // Manage fall damage
             if (!takesFallDamage || player.IsClimbing || IsDead) return;
             ManageFallDamage();
+
+
+
         }
         /// <summary>
         /// Our Player Stats is IDamageable, which means it can be damaged
@@ -100,6 +114,8 @@ namespace cowsins
         /// </summary>
         public void Damage(float _damage, bool isHeadshot)
         {
+            Debug.Log($"Damage called — amount: {_damage}, isServer: {IsServerInitialized}, isDead: {isDead}");
+
             if (player == null)
             {
                 player = playerDependencies.PlayerMovementState;
@@ -138,6 +154,13 @@ namespace cowsins
                 CancelInvoke(nameof(AutoHeal));
                 InvokeRepeating(nameof(AutoHeal), restartAutoHealTime, healRate);
             }
+
+            // At the end of Damage():
+            if (IsServerInitialized)
+            {
+                _networkHealth.Value = health;
+                _networkShield.Value = shield;
+            }
         }
 
 
@@ -169,6 +192,13 @@ namespace cowsins
 
             // Notify UI about the health change
             Events.OnHealthChanged?.Invoke(health, shield, false);
+
+            // At the end of Damage():
+            if (IsServerInitialized)
+            {
+                _networkHealth.Value = health;
+                _networkShield.Value = shield;
+            }
         }
 
         public void HealFull()
@@ -198,9 +228,14 @@ namespace cowsins
         /// </summary>
         private void Die()
         {
-            isDead = true;
-            OnDie?.Invoke();
-            userEvents.OnDeath.Invoke(); // Invoke a custom event
+            if (IsServerInitialized)
+                RpcDie(); // tell all clients
+            else
+            {
+                isDead = true;
+                OnDie?.Invoke();
+                userEvents.OnDeath.Invoke();
+            }
         }
         /// <summary>
         /// Basically find everything the script needs to work
@@ -266,6 +301,29 @@ namespace cowsins
             this.maxHealth = maxHealth;
             this.shield = shield;
             this.maxShield = maxShield;
+        }
+
+        private void OnHealthChanged_Network(float prev, float next, bool asServer)
+        {
+            // Only update UI for the local owner of this player
+            if (!IsOwner) return;
+
+            Events.OnHealthChanged?.Invoke(_networkHealth.Value, _networkShield.Value, prev > next);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        public void RpcTakeDamage(float damage, bool isHeadshot)
+        {
+            Debug.Log($"RpcTakeDamage received — damage: {damage}, isServer: {IsServerInitialized}");
+            Damage(damage, isHeadshot);
+        }
+
+        [ObserversRpc]
+        private void RpcDie()
+        {
+            isDead = true;
+            OnDie?.Invoke();
+            userEvents.OnDeath.Invoke();
         }
     }
 }
