@@ -32,8 +32,8 @@ TagManager:
   - Ladder
   - Wall Run
   - 
-  - 
-  - 
+  - LocalView
+  - ObserverView
   - 
   - 
   - 
